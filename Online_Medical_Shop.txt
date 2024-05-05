@@ -1,0 +1,126 @@
+-- Create a table to store products information
+CREATE TABLE products (
+  product_id   NUMBER PRIMARY KEY,      -- Unique identifier for each product
+  product_name VARCHAR2(100),            -- Name of the product
+  quantity     NUMBER,                    -- Quantity of the product available in inventory
+  price        NUMBER                     -- Price of the product
+);
+
+-- Create a table to store orders information
+CREATE TABLE orders (
+  order_id     NUMBER PRIMARY KEY,       -- Unique identifier for each order
+  product_id   NUMBER,                    -- Identifier of the product ordered
+  quantity     NUMBER,                    -- Quantity of the product ordered
+  customer_id  NUMBER,                    -- Identifier of the customer who placed the order
+  order_date   DATE DEFAULT SYSDATE,     -- Date and time when the order was placed
+  FOREIGN KEY (product_id) REFERENCES products(product_id)  -- Foreign key constraint referencing the products table
+);
+
+-- Create a package for managing inventory operations
+CREATE OR REPLACE PACKAGE medical_shop_inventory AS
+
+  -- Procedure to add a product to inventory
+  PROCEDURE add_product(
+    p_product_id   IN  NUMBER,
+    p_product_name IN  VARCHAR2,
+    p_quantity     IN  NUMBER,
+    p_price        IN  NUMBER
+  );
+
+END medical_shop_inventory;
+/
+
+-- Create the body of the medical_shop_inventory package
+CREATE OR REPLACE PACKAGE BODY medical_shop_inventory AS
+
+  -- Procedure to add a product to inventory
+  PROCEDURE add_product(
+    p_product_id   IN  NUMBER,
+    p_product_name IN  VARCHAR2,
+    p_quantity     IN  NUMBER,
+    p_price        IN  NUMBER
+  ) IS
+  BEGIN
+    -- Insert the product details into the products table
+    INSERT INTO products (product_id, product_name, quantity, price)
+    VALUES (p_product_id, p_product_name, p_quantity, p_price);
+    
+    COMMIT;  -- Commit the transaction to make the changes permanent
+    
+    -- Print message indicating product addition
+    DBMS_OUTPUT.PUT_LINE('Product added to inventory: ' || p_product_name || ', Quantity: ' || p_quantity || ', Price: ' || p_price);
+  END add_product;
+
+END medical_shop_inventory;
+/
+
+-- Create a package for managing order processing operations
+CREATE OR REPLACE PACKAGE medical_shop_orders AS
+
+  -- Procedure to process an order
+  PROCEDURE process_order(
+    p_order_id     IN  NUMBER,
+    p_product_id   IN  NUMBER,
+    p_quantity     IN  NUMBER,
+    p_customer_id  IN  NUMBER
+  );
+
+END medical_shop_orders;
+/
+
+-- Create the body of the medical_shop_orders package
+CREATE OR REPLACE PACKAGE BODY medical_shop_orders AS
+
+  -- Procedure to process an order
+  PROCEDURE process_order(
+    p_order_id     IN  NUMBER,
+    p_product_id   IN  NUMBER,
+    p_quantity     IN  NUMBER,
+    p_customer_id  IN  NUMBER
+  ) IS
+    v_available_quantity NUMBER;
+  BEGIN
+    -- Check if the requested quantity is available in inventory
+    SELECT quantity INTO v_available_quantity
+    FROM products
+    WHERE product_id = p_product_id;
+    
+    IF v_available_quantity >= p_quantity THEN
+      -- Deduct the sold quantity from inventory
+      UPDATE products
+      SET quantity = quantity - p_quantity
+      WHERE product_id = p_product_id;
+      
+      -- Insert the order details into orders table
+      INSERT INTO orders (order_id, product_id, quantity, customer_id)
+      VALUES (p_order_id, p_product_id, p_quantity, p_customer_id);
+      
+      COMMIT;  -- Commit the transaction to make the changes permanent
+      
+      -- Print message indicating order processing
+      DBMS_OUTPUT.PUT_LINE('Order processed successfully. Order ID: ' || p_order_id || ', Product ID: ' || p_product_id || ', Quantity: ' || p_quantity || ', Customer ID: ' || p_customer_id);
+    ELSE
+      -- Print message indicating insufficient quantity
+      DBMS_OUTPUT.PUT_LINE('Insufficient quantity in inventory.');
+    END IF;
+  END process_order;
+
+END medical_shop_orders;
+/
+
+-- Test block to demonstrate the usage of procedures
+DECLARE
+  v_product_id   NUMBER := 1;                   -- Product ID
+  v_product_name VARCHAR2(100) := 'Aspirin';    -- Product name
+  v_quantity     NUMBER := 100;                  -- Quantity of the product
+  v_price        NUMBER := 5.99;                 -- Price of the product
+  v_order_id     NUMBER := 1;                    -- Order ID
+  v_customer_id  NUMBER := 123;                  -- Customer ID
+BEGIN
+  -- Add a product to inventory
+  medical_shop_inventory.add_product(v_product_id, v_product_name, v_quantity, v_price);
+  
+  -- Process an order
+  medical_shop_orders.process_order(v_order_id, v_product_id, 10, v_customer_id);
+END;
+/
